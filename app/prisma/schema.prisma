@@ -16,3 +16,11 @@ model House {
   address   String
   createdAt DateTime @default(now())
 }
+
+model Employee {
+  id        Int      @id @default(autoincrement())
+  fullName  String
+  role      String
+  phone     String
+  createdAt DateTime @default(now())
+}
