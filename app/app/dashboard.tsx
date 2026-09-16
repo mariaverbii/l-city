@@ -1139,6 +1139,67 @@ export default function Dashboard({
                 ))}
               </ul>
             )}
+            <div className="report-trigger">
+              <p className="card-kicker">Отчёт</p>
+              <h2>Сформировать отчёт по дому</h2>
+              <form
+                action="/report"
+                className="report-trigger-grid"
+                method="get"
+                target="_blank"
+              >
+                <div>
+                  <label className="field-label" htmlFor="report-house">
+                    Дом
+                  </label>
+                  <select
+                    className="text-input"
+                    defaultValue=""
+                    id="report-house"
+                    name="houseId"
+                    required
+                  >
+                    <option disabled value="">
+                      Выберите дом
+                    </option>
+                    {houses.map((house) => (
+                      <option key={house.id} value={house.id}>
+                        {house.address}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="field-label" htmlFor="report-from">
+                    Дата от
+                  </label>
+                  <input
+                    className="text-input"
+                    id="report-from"
+                    name="from"
+                    type="date"
+                  />
+                </div>
+                <div>
+                  <label className="field-label" htmlFor="report-to">
+                    Дата до
+                  </label>
+                  <input
+                    className="text-input"
+                    id="report-to"
+                    name="to"
+                    type="date"
+                  />
+                </div>
+                <button className="primary-button" type="submit">
+                  Открыть отчёт
+                </button>
+              </form>
+              <p className="field-hint">
+                Отчёт откроется в новой вкладке — там можно распечатать его
+                или сохранить как PDF.
+              </p>
+            </div>
           </div>
         </section>
       )}
