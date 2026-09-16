@@ -12,6 +12,11 @@ import {
   deleteHouse,
   updateHouse,
 } from "./actions/houses";
+import {
+  createCompletedWork,
+  deleteCompletedWork,
+  updateCompletedWork,
+} from "./actions/completed-works";
 
 type House = {
   id: number;
@@ -25,24 +30,67 @@ type Employee = {
   phone: string;
 };
 
-type Tab = "houses" | "employees";
+type CompletedWork = {
+  id: number;
+  description: string;
+  location: string;
+  volume: string;
+  materials: string;
+  beforePhotoKey: string | null;
+  afterPhotoKey: string | null;
+  createdAt: Date;
+  house: {
+    id: number;
+    address: string;
+  };
+  employee: {
+    id: number;
+    fullName: string;
+    role: string;
+  };
+};
+
+type Tab = "houses" | "employees" | "works";
 
 type DashboardProps = {
   houses: House[];
   employees: Employee[];
+  completedWorks: CompletedWork[];
 };
 
-export default function Dashboard({ houses, employees }: DashboardProps) {
+const emptyWorkForm = {
+  houseId: "",
+  employeeId: "",
+  description: "",
+  location: "",
+  volume: "",
+  materials: "",
+};
+
+function photoUrl(key: string) {
+  return `/api/work-photos/${key
+    .split("/")
+    .map((part) => encodeURIComponent(part))
+    .join("/")}`;
+}
+
+export default function Dashboard({
+  houses,
+  employees,
+  completedWorks,
+}: DashboardProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>("houses");
   const [editingHouseId, setEditingHouseId] = useState<number | null>(null);
   const [editingEmployeeId, setEditingEmployeeId] = useState<number | null>(null);
+  const [editingWorkId, setEditingWorkId] = useState<number | null>(null);
   const [houseAddress, setHouseAddress] = useState("");
   const [employeeForm, setEmployeeForm] = useState({
     fullName: "",
     role: "",
     phone: "",
   });
+  const [workForm, setWorkForm] = useState(emptyWorkForm);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -102,6 +150,36 @@ export default function Dashboard({ houses, employees }: DashboardProps) {
     });
   }
 
+  function submitWork(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    resetFeedback();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const editingId = editingWorkId;
+
+    startTransition(async () => {
+      const result =
+        editingId === null
+          ? await createCompletedWork(formData)
+          : await updateCompletedWork(editingId, formData);
+
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+
+      form.reset();
+      setWorkForm(emptyWorkForm);
+      setEditingWorkId(null);
+      setMessage(
+        editingId === null
+          ? "Работа добавлена в журнал."
+          : "Изменения сохранены.",
+      );
+      router.refresh();
+    });
+  }
+
   function startHouseEditing(house: House) {
     resetFeedback();
     setActiveTab("houses");
@@ -129,6 +207,26 @@ export default function Dashboard({ houses, employees }: DashboardProps) {
   function cancelEmployeeEditing() {
     setEditingEmployeeId(null);
     setEmployeeForm({ fullName: "", role: "", phone: "" });
+    resetFeedback();
+  }
+
+  function startWorkEditing(work: CompletedWork) {
+    resetFeedback();
+    setActiveTab("works");
+    setEditingWorkId(work.id);
+    setWorkForm({
+      houseId: String(work.house.id),
+      employeeId: String(work.employee.id),
+      description: work.description,
+      location: work.location,
+      volume: work.volume,
+      materials: work.materials,
+    });
+  }
+
+  function cancelWorkEditing() {
+    setEditingWorkId(null);
+    setWorkForm(emptyWorkForm);
     resetFeedback();
   }
 
@@ -170,6 +268,25 @@ export default function Dashboard({ houses, employees }: DashboardProps) {
     });
   }
 
+  function removeWork(work: CompletedWork) {
+    if (!window.confirm(`Удалить запись о работе «${work.description}»?`)) {
+      return;
+    }
+
+    resetFeedback();
+    startTransition(async () => {
+      const result = await deleteCompletedWork(work.id);
+
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+
+      setMessage("Запись о работе удалена.");
+      router.refresh();
+    });
+  }
+
   return (
     <main className="page-shell">
       <header className="page-header">
@@ -177,14 +294,24 @@ export default function Dashboard({ houses, employees }: DashboardProps) {
           <p className="eyebrow">Управление недвижимостью</p>
           <h1>Л-Сити</h1>
           <p className="page-description">
-            Дома и сотрудники в одном месте
+            Дома, сотрудники и журнал выполненных работ
           </p>
         </div>
         <div className="header-stat">
           <span className="header-stat-value">
-            {activeTab === "houses" ? houses.length : employees.length}
+            {activeTab === "houses"
+              ? houses.length
+              : activeTab === "employees"
+                ? employees.length
+                : completedWorks.length}
           </span>
-          <span>{activeTab === "houses" ? "домов" : "сотрудников"}</span>
+          <span>
+            {activeTab === "houses"
+              ? "домов"
+              : activeTab === "employees"
+                ? "сотрудников"
+                : "записей"}
+          </span>
         </div>
       </header>
 
@@ -210,6 +337,17 @@ export default function Dashboard({ houses, employees }: DashboardProps) {
         >
           Сотрудники
           <span className="tab-count">{employees.length}</span>
+        </button>
+        <button
+          className={activeTab === "works" ? "tab active" : "tab"}
+          onClick={() => {
+            setActiveTab("works");
+            resetFeedback();
+          }}
+          type="button"
+        >
+          Выполненные работы
+          <span className="tab-count">{completedWorks.length}</span>
         </button>
       </nav>
 
@@ -317,7 +455,7 @@ export default function Dashboard({ houses, employees }: DashboardProps) {
             )}
           </div>
         </section>
-      ) : (
+      ) : activeTab === "employees" ? (
         <section className="content-grid" aria-labelledby="employees-heading">
           <div className="form-card">
             <div className="card-heading">
@@ -460,6 +598,281 @@ export default function Dashboard({ houses, employees }: DashboardProps) {
                         className="danger-button"
                         disabled={isPending}
                         onClick={() => removeEmployee(employee)}
+                        type="button"
+                      >
+                        Удалить
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </section>
+      ) : (
+        <section className="content-grid work-grid" aria-labelledby="works-heading">
+          <div className="form-card">
+            <div className="card-heading">
+              <div>
+                <p className="card-kicker">
+                  {editingWorkId === null ? "Новая запись" : "Редактирование"}
+                </p>
+                <h2 id="works-heading">
+                  {editingWorkId === null
+                    ? "Добавить выполненную работу"
+                    : "Изменить запись"}
+                </h2>
+              </div>
+              <span className="card-icon" aria-hidden="true">
+                {editingWorkId === null ? "+" : "↗"}
+              </span>
+            </div>
+            <form onSubmit={submitWork}>
+              <label className="field-label" htmlFor="work-house">
+                Дом
+              </label>
+              <select
+                className="text-input"
+                id="work-house"
+                name="houseId"
+                onChange={(event) =>
+                  setWorkForm((current) => ({
+                    ...current,
+                    houseId: event.target.value,
+                  }))
+                }
+                required
+                value={workForm.houseId}
+              >
+                <option value="">Выберите дом</option>
+                {houses.map((house) => (
+                  <option key={house.id} value={house.id}>
+                    {house.address}
+                  </option>
+                ))}
+              </select>
+
+              <label className="field-label" htmlFor="work-employee">
+                Сотрудник
+              </label>
+              <select
+                className="text-input"
+                id="work-employee"
+                name="employeeId"
+                onChange={(event) =>
+                  setWorkForm((current) => ({
+                    ...current,
+                    employeeId: event.target.value,
+                  }))
+                }
+                required
+                value={workForm.employeeId}
+              >
+                <option value="">Выберите сотрудника</option>
+                {employees.map((employee) => (
+                  <option key={employee.id} value={employee.id}>
+                    {employee.fullName} · {employee.role}
+                  </option>
+                ))}
+              </select>
+
+              <label className="field-label" htmlFor="work-description">
+                Категория / описание работы
+              </label>
+              <textarea
+                className="text-input text-area"
+                id="work-description"
+                name="description"
+                onChange={(event) =>
+                  setWorkForm((current) => ({
+                    ...current,
+                    description: event.target.value,
+                  }))
+                }
+                placeholder="Например, ремонт подъездного освещения"
+                required
+                rows={3}
+                value={workForm.description}
+              />
+
+              <label className="field-label" htmlFor="work-location">
+                Место проведения
+              </label>
+              <input
+                className="text-input"
+                id="work-location"
+                name="location"
+                onChange={(event) =>
+                  setWorkForm((current) => ({
+                    ...current,
+                    location: event.target.value,
+                  }))
+                }
+                placeholder="Например, подъезд №2, этаж 3"
+                required
+                type="text"
+                value={workForm.location}
+              />
+
+              <label className="field-label" htmlFor="work-volume">
+                Объём работ
+              </label>
+              <input
+                className="text-input"
+                id="work-volume"
+                name="volume"
+                onChange={(event) =>
+                  setWorkForm((current) => ({
+                    ...current,
+                    volume: event.target.value,
+                  }))
+                }
+                placeholder="Например, 12 светильников"
+                required
+                type="text"
+                value={workForm.volume}
+              />
+
+              <label className="field-label" htmlFor="work-materials">
+                Использованные материалы
+              </label>
+              <textarea
+                className="text-input text-area"
+                id="work-materials"
+                name="materials"
+                onChange={(event) =>
+                  setWorkForm((current) => ({
+                    ...current,
+                    materials: event.target.value,
+                  }))
+                }
+                placeholder="Свободное описание материалов"
+                rows={2}
+                value={workForm.materials}
+              />
+
+              <div className="photo-fields">
+                <div>
+                  <label className="field-label" htmlFor="before-photo">
+                    Фото до
+                  </label>
+                  <input
+                    accept="image/jpeg,image/png,image/webp"
+                    className="file-input"
+                    id="before-photo"
+                    name="beforePhoto"
+                    type="file"
+                  />
+                </div>
+                <div>
+                  <label className="field-label" htmlFor="after-photo">
+                    Фото после
+                  </label>
+                  <input
+                    accept="image/jpeg,image/png,image/webp"
+                    className="file-input"
+                    id="after-photo"
+                    name="afterPhoto"
+                    type="file"
+                  />
+                </div>
+              </div>
+              <p className="field-hint">
+                JPG, PNG или WebP, до 10 МБ. При редактировании новый файл заменит
+                текущий.
+              </p>
+
+              <div className="form-actions">
+                <button className="primary-button" disabled={isPending} type="submit">
+                  {isPending
+                    ? "Сохраняем..."
+                    : editingWorkId === null
+                      ? "Добавить в журнал"
+                      : "Сохранить"}
+                </button>
+                {editingWorkId !== null && (
+                  <button
+                    className="secondary-button"
+                    onClick={cancelWorkEditing}
+                    type="button"
+                  >
+                    Отменить
+                  </button>
+                )}
+              </div>
+            </form>
+          </div>
+
+          <div className="list-card">
+            <div className="list-heading">
+              <div>
+                <p className="card-kicker">Журнал работ</p>
+                <h2>Выполненные работы</h2>
+              </div>
+              <span className="list-total">{completedWorks.length}</span>
+            </div>
+            {completedWorks.length === 0 ? (
+              <div className="empty-state">
+                <span className="empty-icon" aria-hidden="true">
+                  ✓
+                </span>
+                <p>Записей пока нет</p>
+                <span>Добавьте первую выполненную работу с помощью формы.</span>
+              </div>
+            ) : (
+              <ul className="record-list work-list">
+                {completedWorks.map((work) => (
+                  <li className="record-row work-row" key={work.id}>
+                    <div className="record-mark" aria-hidden="true">
+                      ✓
+                    </div>
+                    <div className="record-main work-main">
+                      <strong>{work.description}</strong>
+                      <span>
+                        {work.house.address} · {work.employee.fullName}
+                      </span>
+                      <span>
+                        {work.location} · Объём: {work.volume}
+                      </span>
+                      {work.materials && (
+                        <span>Материалы: {work.materials}</span>
+                      )}
+                      <span>
+                        {new Intl.DateTimeFormat("ru-RU", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                        }).format(new Date(work.createdAt))}
+                      </span>
+                      {(work.beforePhotoKey || work.afterPhotoKey) && (
+                        <div className="photo-previews">
+                          {work.beforePhotoKey && (
+                            <img
+                              alt={`Фото до: ${work.description}`}
+                              src={photoUrl(work.beforePhotoKey)}
+                            />
+                          )}
+                          {work.afterPhotoKey && (
+                            <img
+                              alt={`Фото после: ${work.description}`}
+                              src={photoUrl(work.afterPhotoKey)}
+                            />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div className="row-actions">
+                      <button
+                        className="text-button"
+                        onClick={() => startWorkEditing(work)}
+                        type="button"
+                      >
+                        Изменить
+                      </button>
+                      <button
+                        className="danger-button"
+                        disabled={isPending}
+                        onClick={() => removeWork(work)}
                         type="button"
                       >
                         Удалить

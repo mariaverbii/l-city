@@ -11,7 +11,28 @@ export default async function Home() {
       select: { id: true, fullName: true, role: true, phone: true },
       orderBy: { id: "asc" },
     }),
+    db.completedWork.findMany({
+      select: {
+        id: true,
+        description: true,
+        location: true,
+        volume: true,
+        materials: true,
+        beforePhotoKey: true,
+        afterPhotoKey: true,
+        createdAt: true,
+        house: { select: { id: true, address: true } },
+        employee: { select: { id: true, fullName: true, role: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    }),
   ]);
 
-  return <Dashboard employees={employees} houses={houses} />;
+  return (
+    <Dashboard
+      completedWorks={completedWorks}
+      employees={employees}
+      houses={houses}
+    />
+  );
 }

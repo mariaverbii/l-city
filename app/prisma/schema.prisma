@@ -15,6 +15,8 @@ model House {
   id        Int      @id @default(autoincrement())
   address   String
   createdAt DateTime @default(now())
+
+  completedWorks CompletedWork[]
 }
 
 model Employee {
@@ -23,4 +25,28 @@ model Employee {
   role      String
   phone     String
   createdAt DateTime @default(now())
+
+  completedWorks CompletedWork[]
+}
+
+model CompletedWork {
+  id              Int       @id @default(autoincrement())
+  houseId         Int
+  employeeId      Int
+  description     String
+  location        String
+  volume          String
+  materials       String
+  beforePhotoKey  String?
+  beforePhotoType String?
+  afterPhotoKey   String?
+  afterPhotoType  String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  house    House    @relation(fields: [houseId], references: [id], onDelete: Restrict)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@index([houseId])
+  @@index([employeeId])
 }
