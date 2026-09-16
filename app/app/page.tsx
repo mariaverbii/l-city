@@ -45,6 +45,14 @@ function getNextDate(value: string) {
   return date;
 }
 
+type CostStatus = "all" | "none" | "calculated" | "confirmed";
+
+function parseCostStatus(value: string | undefined): CostStatus {
+  return value === "none" || value === "calculated" || value === "confirmed"
+    ? value
+    : "all";
+}
+
 export default async function Home({
   searchParams,
 }: {
@@ -55,6 +63,7 @@ export default async function Home({
   const employeeId = parsePositiveId(getSearchParam(params, "employeeId"));
   const from = parseDate(getSearchParam(params, "from"));
   const to = parseDate(getSearchParam(params, "to"));
+  const costStatus = parseCostStatus(getSearchParam(params, "costStatus"));
   const requestedTab = getSearchParam(params, "tab");
   const initialTab: DashboardTab =
     requestedTab === "employees" || requestedTab === "works"
@@ -74,6 +83,13 @@ export default async function Home({
           },
         }
       : {}),
+    ...(costStatus === "none"
+      ? { costKopecks: null }
+      : costStatus === "calculated"
+        ? { costKopecks: { not: null }, costConfirmed: false }
+        : costStatus === "confirmed"
+          ? { costConfirmed: true }
+          : {}),
   };
 
   const [houses, employees, completedWorks] = await Promise.all([
@@ -95,6 +111,8 @@ export default async function Home({
         materials: true,
         beforePhotoKey: true,
         afterPhotoKey: true,
+        costKopecks: true,
+        costConfirmed: true,
         createdAt: true,
         house: { select: { id: true, address: true } },
         employee: { select: { id: true, fullName: true, role: true } },
@@ -110,6 +128,7 @@ export default async function Home({
       houses={houses}
       initialTab={initialTab}
       workFilters={{
+        costStatus,
         employeeId: employeeId ? String(employeeId) : "",
         from,
         houseId: houseId ? String(houseId) : "",
