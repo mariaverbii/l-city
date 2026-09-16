@@ -41,6 +41,8 @@ model CompletedWork {
   beforePhotoType String?
   afterPhotoKey   String?
   afterPhotoType  String?
+  costKopecks     Int?
+  costConfirmed   Boolean   @default(false)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
