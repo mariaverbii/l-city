@@ -57,6 +57,13 @@ type DashboardProps = {
   houses: House[];
   employees: Employee[];
   completedWorks: CompletedWork[];
+  initialTab: Tab;
+  workFilters: {
+    houseId: string;
+    employeeId: string;
+    from: string;
+    to: string;
+  };
 };
 
 const emptyWorkForm = {
@@ -79,9 +86,11 @@ export default function Dashboard({
   houses,
   employees,
   completedWorks,
+  initialTab,
+  workFilters,
 }: DashboardProps) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<Tab>("houses");
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab);
   const [editingHouseId, setEditingHouseId] = useState<number | null>(null);
   const [editingEmployeeId, setEditingEmployeeId] = useState<number | null>(null);
   const [editingWorkId, setEditingWorkId] = useState<number | null>(null);
@@ -812,6 +821,79 @@ export default function Dashboard({
               </div>
               <span className="list-total">{completedWorks.length}</span>
             </div>
+            <form className="work-filters" method="get">
+              <input name="tab" type="hidden" value="works" />
+              <div className="work-filter-grid">
+                <div>
+                  <label className="field-label" htmlFor="filter-house">
+                    Дом
+                  </label>
+                  <select
+                    className="text-input"
+                    defaultValue={workFilters.houseId}
+                    id="filter-house"
+                    name="houseId"
+                  >
+                    <option value="">Все дома</option>
+                    {houses.map((house) => (
+                      <option key={house.id} value={house.id}>
+                        {house.address}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="field-label" htmlFor="filter-employee">
+                    Сотрудник
+                  </label>
+                  <select
+                    className="text-input"
+                    defaultValue={workFilters.employeeId}
+                    id="filter-employee"
+                    name="employeeId"
+                  >
+                    <option value="">Все сотрудники</option>
+                    {employees.map((employee) => (
+                      <option key={employee.id} value={employee.id}>
+                        {employee.fullName} · {employee.role}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="field-label" htmlFor="filter-from">
+                    Дата от
+                  </label>
+                  <input
+                    className="text-input"
+                    defaultValue={workFilters.from}
+                    id="filter-from"
+                    name="from"
+                    type="date"
+                  />
+                </div>
+                <div>
+                  <label className="field-label" htmlFor="filter-to">
+                    Дата до
+                  </label>
+                  <input
+                    className="text-input"
+                    defaultValue={workFilters.to}
+                    id="filter-to"
+                    name="to"
+                    type="date"
+                  />
+                </div>
+              </div>
+              <div className="work-filter-actions">
+                <button className="primary-button" type="submit">
+                  Применить фильтры
+                </button>
+                <a className="filter-reset" href="?tab=works">
+                  Сбросить фильтры
+                </a>
+              </div>
+            </form>
             {completedWorks.length === 0 ? (
               <div className="empty-state">
                 <span className="empty-icon" aria-hidden="true">
