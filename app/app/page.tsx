@@ -2,7 +2,7 @@ import { db } from "./db";
 import Dashboard from "./dashboard";
 
 export default async function Home() {
-  const [houses, employees] = await Promise.all([
+  const [houses, employees, completedWorks] = await Promise.all([
     db.house.findMany({
       select: { id: true, address: true },
       orderBy: { id: "asc" },

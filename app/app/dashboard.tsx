@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState, useTransition } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   createEmployee,
@@ -847,15 +848,21 @@ export default function Dashboard({
                       {(work.beforePhotoKey || work.afterPhotoKey) && (
                         <div className="photo-previews">
                           {work.beforePhotoKey && (
-                            <img
+                            <Image
                               alt={`Фото до: ${work.description}`}
                               src={photoUrl(work.beforePhotoKey)}
+                              width={320}
+                              height={240}
+                              unoptimized
                             />
                           )}
                           {work.afterPhotoKey && (
-                            <img
+                            <Image
                               alt={`Фото после: ${work.description}`}
                               src={photoUrl(work.afterPhotoKey)}
+                              width={320}
+                              height={240}
+                              unoptimized
                             />
                           )}
                         </div>
