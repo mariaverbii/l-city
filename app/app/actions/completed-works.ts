@@ -258,6 +258,127 @@ export async function updateCompletedWork(
   }
 }
 
+function parseCostRubles(value: string): number | null {
+  const trimmed = value.trim().replace(",", ".");
+
+  if (!trimmed || !/^\d+(\.\d{1,2})?$/.test(trimmed)) {
+    return null;
+  }
+
+  const rubles = Number(trimmed);
+
+  if (!Number.isFinite(rubles) || rubles < 0 || rubles > 100_000_000) {
+    return null;
+  }
+
+  return Math.round(rubles * 100);
+}
+
+export async function setCompletedWorkCost(
+  id: number,
+  formData: FormData,
+): Promise<CompletedWorkActionResult> {
+  const raw = String(formData.get("costRubles") ?? "").trim();
+  const costKopecks = raw ? parseCostRubles(raw) : null;
+
+  if (raw && costKopecks === null) {
+    return {
+      ok: false,
+      error: "Введите корректную стоимость в рублях (например, 1500 или 1500.50).",
+    };
+  }
+
+  const current = await db.completedWork.findUnique({
+    where: { id },
+    select: { costConfirmed: true },
+  });
+
+  if (!current) {
+    return { ok: false, error: "Запись о работе не найдена." };
+  }
+
+  if (current.costConfirmed) {
+    return {
+      ok: false,
+      error: "Стоимость подтверждена и не может быть изменена. Сначала отмените подтверждение.",
+    };
+  }
+
+  try {
+    await db.completedWork.update({
+      where: { id },
+      data: { costKopecks },
+    });
+    revalidatePath("/");
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "Не удалось сохранить стоимость." };
+  }
+}
+
+export async function confirmCompletedWorkCost(
+  id: number,
+): Promise<CompletedWorkActionResult> {
+  const current = await db.completedWork.findUnique({
+    where: { id },
+    select: { costKopecks: true, costConfirmed: true },
+  });
+
+  if (!current) {
+    return { ok: false, error: "Запись о работе не найдена." };
+  }
+
+  if (current.costConfirmed) {
+    return { ok: false, error: "Стоимость уже подтверждена." };
+  }
+
+  if (current.costKopecks === null) {
+    return {
+      ok: false,
+      error: "Сначала укажите стоимость, затем подтвердите её.",
+    };
+  }
+
+  try {
+    await db.completedWork.update({
+      where: { id },
+      data: { costConfirmed: true },
+    });
+    revalidatePath("/");
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "Не удалось подтвердить стоимость." };
+  }
+}
+
+export async function revertCompletedWorkCostConfirmation(
+  id: number,
+): Promise<CompletedWorkActionResult> {
+  const current = await db.completedWork.findUnique({
+    where: { id },
+    select: { costConfirmed: true },
+  });
+
+  if (!current) {
+    return { ok: false, error: "Запись о работе не найдена." };
+  }
+
+  if (!current.costConfirmed) {
+    return { ok: false, error: "Стоимость ещё не подтверждена." };
+  }
+
+  try {
+    await db.completedWork.update({
+      where: { id },
+      data: { costConfirmed: false },
+    });
+    revalidatePath("/");
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "Не удалось отменить подтверждение стоимости." };
+  }
+}
+
 export async function deleteCompletedWork(
   id: number,
 ): Promise<CompletedWorkActionResult> {
