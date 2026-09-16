@@ -34,3 +34,9 @@ waitForPort = 5000
 
 [workflows.workflow.metadata]
 outputType = "webview"
+
+
+[deployment]
+deploymentTarget = "autoscale"
+build = ["bash", "-c", "cd app && npm run build"]
+run = ["bash", "-c", "cd app && npm start"]
