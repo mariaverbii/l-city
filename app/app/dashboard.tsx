@@ -14,8 +14,11 @@ import {
   updateHouse,
 } from "./actions/houses";
 import {
+  confirmCompletedWorkCost,
   createCompletedWork,
   deleteCompletedWork,
+  revertCompletedWorkCostConfirmation,
+  setCompletedWorkCost,
   updateCompletedWork,
 } from "./actions/completed-works";
 
@@ -39,6 +42,8 @@ type CompletedWork = {
   materials: string;
   beforePhotoKey: string | null;
   afterPhotoKey: string | null;
+  costKopecks: number | null;
+  costConfirmed: boolean;
   createdAt: Date;
   house: {
     id: number;
@@ -53,6 +58,8 @@ type CompletedWork = {
 
 type Tab = "houses" | "employees" | "works";
 
+type CostStatus = "all" | "none" | "calculated" | "confirmed";
+
 type DashboardProps = {
   houses: House[];
   employees: Employee[];
@@ -63,6 +70,7 @@ type DashboardProps = {
     employeeId: string;
     from: string;
     to: string;
+    costStatus: CostStatus;
   };
 };
 
@@ -80,6 +88,17 @@ function photoUrl(key: string) {
     .split("/")
     .map((part) => encodeURIComponent(part))
     .join("/")}`;
+}
+
+function formatCost(costKopecks: number | null) {
+  if (costKopecks === null) {
+    return "Не рассчитано";
+  }
+
+  return `${new Intl.NumberFormat("ru-RU", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(costKopecks / 100)} ₽`;
 }
 
 export default function Dashboard({
@@ -293,6 +312,70 @@ export default function Dashboard({
       }
 
       setMessage("Запись о работе удалена.");
+      router.refresh();
+    });
+  }
+
+  function submitWorkCost(work: CompletedWork, event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    resetFeedback();
+    const formData = new FormData(event.currentTarget);
+
+    startTransition(async () => {
+      const result = await setCompletedWorkCost(work.id, formData);
+
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+
+      setMessage("Стоимость сохранена.");
+      router.refresh();
+    });
+  }
+
+  function confirmWorkCost(work: CompletedWork) {
+    if (
+      !window.confirm(
+        `Подтвердить стоимость «${formatCost(work.costKopecks)}» для записи «${work.description}»? После подтверждения изменить стоимость нельзя без отмены подтверждения.`,
+      )
+    ) {
+      return;
+    }
+
+    resetFeedback();
+    startTransition(async () => {
+      const result = await confirmCompletedWorkCost(work.id);
+
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+
+      setMessage("Стоимость подтверждена.");
+      router.refresh();
+    });
+  }
+
+  function revertWorkCostConfirmation(work: CompletedWork) {
+    if (
+      !window.confirm(
+        `Отменить подтверждение стоимости для записи «${work.description}»?`,
+      )
+    ) {
+      return;
+    }
+
+    resetFeedback();
+    startTransition(async () => {
+      const result = await revertCompletedWorkCostConfirmation(work.id);
+
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+
+      setMessage("Подтверждение стоимости отменено.");
       router.refresh();
     });
   }
@@ -884,6 +967,22 @@ export default function Dashboard({
                     type="date"
                   />
                 </div>
+                <div>
+                  <label className="field-label" htmlFor="filter-cost-status">
+                    Стоимость
+                  </label>
+                  <select
+                    className="text-input"
+                    defaultValue={workFilters.costStatus}
+                    id="filter-cost-status"
+                    name="costStatus"
+                  >
+                    <option value="all">Все записи</option>
+                    <option value="none">Не рассчитано</option>
+                    <option value="calculated">Рассчитано (не подтверждено)</option>
+                    <option value="confirmed">Подтверждено</option>
+                  </select>
+                </div>
               </div>
               <div className="work-filter-actions">
                 <button className="primary-button" type="submit">
@@ -949,6 +1048,75 @@ export default function Dashboard({
                           )}
                         </div>
                       )}
+                      <div className="work-cost">
+                        <span
+                          className={
+                            work.costConfirmed
+                              ? "cost-badge cost-confirmed"
+                              : work.costKopecks !== null
+                                ? "cost-badge cost-calculated"
+                                : "cost-badge cost-none"
+                          }
+                        >
+                          {work.costConfirmed
+                            ? `Подтверждено: ${formatCost(work.costKopecks)}`
+                            : work.costKopecks !== null
+                              ? `Рассчитано: ${formatCost(work.costKopecks)}`
+                              : "Стоимость не рассчитана"}
+                        </span>
+                        {work.costConfirmed ? (
+                          <button
+                            className="secondary-button"
+                            disabled={isPending}
+                            onClick={() => revertWorkCostConfirmation(work)}
+                            type="button"
+                          >
+                            Отменить подтверждение
+                          </button>
+                        ) : (
+                          <form
+                            className="cost-form"
+                            onSubmit={(event) => submitWorkCost(work, event)}
+                          >
+                            <label
+                              className="sr-only"
+                              htmlFor={`cost-${work.id}`}
+                            >
+                              Стоимость, ₽
+                            </label>
+                            <input
+                              className="text-input cost-input"
+                              defaultValue={
+                                work.costKopecks !== null
+                                  ? (work.costKopecks / 100).toFixed(2)
+                                  : ""
+                              }
+                              id={`cost-${work.id}`}
+                              inputMode="decimal"
+                              name="costRubles"
+                              placeholder="Стоимость, ₽"
+                              type="text"
+                            />
+                            <button
+                              className="secondary-button"
+                              disabled={isPending}
+                              type="submit"
+                            >
+                              Сохранить стоимость
+                            </button>
+                            {work.costKopecks !== null && (
+                              <button
+                                className="primary-button"
+                                disabled={isPending}
+                                onClick={() => confirmWorkCost(work)}
+                                type="button"
+                              >
+                                Подтвердить
+                              </button>
+                            )}
+                          </form>
+                        )}
+                      </div>
                     </div>
                     <div className="row-actions">
                       <button
