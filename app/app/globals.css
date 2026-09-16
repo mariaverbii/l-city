@@ -639,6 +639,10 @@ h2 {
     width: 100%;
   }
 
+  .report-trigger-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
   .record-row {
     align-items: flex-start;
     padding: 16px 20px;
@@ -657,5 +661,136 @@ h2 {
   .list-heading {
     padding-left: 20px;
     padding-right: 20px;
+  }
+}
+
+.report-trigger {
+  background: #fafbfc;
+  border-top: 1px solid var(--line);
+  padding: 18px 28px;
+}
+
+.report-trigger-grid {
+  align-items: end;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+}
+
+.report-trigger-grid .field-label {
+  display: block;
+  margin-bottom: 7px;
+}
+
+.report-trigger-grid .primary-button {
+  white-space: nowrap;
+}
+
+.report-page {
+  background: #fff;
+  color: #1a1a1a;
+  margin: 0 auto;
+  max-width: 900px;
+  padding: 40px 32px 60px;
+}
+
+.report-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 24px;
+}
+
+.report-error,
+.report-empty {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.report-header {
+  border-bottom: 2px solid #1a1a1a;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+}
+
+.report-company {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin: 0 0 6px;
+  text-transform: uppercase;
+}
+
+.report-header h1 {
+  font-size: 22px;
+  margin: 0 0 10px;
+}
+
+.report-meta {
+  font-size: 14px;
+  margin: 0 0 4px;
+}
+
+.report-generated {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 0;
+}
+
+.report-table {
+  border-collapse: collapse;
+  font-size: 12px;
+  width: 100%;
+}
+
+.report-table th,
+.report-table td {
+  border: 1px solid #cbd4e1;
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.report-table th {
+  background: #f0f3f7;
+  font-weight: 700;
+}
+
+.report-footer {
+  border-top: 1px solid #cbd4e1;
+  margin-top: 24px;
+  padding-top: 16px;
+}
+
+.report-total {
+  font-size: 15px;
+  margin: 0 0 8px;
+}
+
+.report-note {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 0 0 6px;
+}
+
+@media print {
+  body {
+    background: #fff;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .report-page {
+    max-width: none;
+    padding: 0;
+  }
+
+  .report-table {
+    break-inside: auto;
+  }
+
+  .report-table tr {
+    break-inside: avoid;
   }
 }
