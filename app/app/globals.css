@@ -360,7 +360,7 @@ h2 {
 .work-filter-grid {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .work-filter-grid .field-label {
@@ -479,6 +479,68 @@ h2 {
   width: 52px;
 }
 
+.sr-only {
+  border: 0;
+  clip: rect(0, 0, 0, 0);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+.work-cost {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.cost-badge {
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 10px;
+  white-space: nowrap;
+}
+
+.cost-none {
+  background: #f0f3f7;
+  color: var(--muted);
+}
+
+.cost-calculated {
+  background: #fff6df;
+  color: #9a6b12;
+}
+
+.cost-confirmed {
+  background: #eaf8f0;
+  color: #287a4a;
+}
+
+.cost-form {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cost-form .primary-button,
+.cost-form .secondary-button {
+  flex: 0 0 auto;
+  padding: 7px 12px;
+}
+
+.cost-input {
+  margin-bottom: 0;
+  padding: 8px 10px;
+  width: 120px;
+}
+
 .row-actions {
   align-items: center;
   display: flex;
@@ -566,6 +628,15 @@ h2 {
 
   .work-filter-grid {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .cost-form {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .cost-input {
+    width: 100%;
   }
 
   .record-row {
