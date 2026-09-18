@@ -32,6 +32,7 @@ type Employee = {
   fullName: string;
   role: string;
   phone: string;
+  maxUserId: string | null;
 };
 
 type CompletedWork = {
@@ -678,6 +679,15 @@ export default function Dashboard({
                       <span>
                         {employee.role} · {employee.phone}
                       </span>
+                      <div
+                        className={`max-badge ${
+                          employee.maxUserId ? "max-linked" : "max-not-linked"
+                        }`}
+                      >
+                        {employee.maxUserId
+                          ? "MAX-бот подключён"
+                          : "MAX-бот не подключён"}
+                      </div>
                     </div>
                     <div className="row-actions">
                       <button
