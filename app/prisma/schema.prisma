@@ -24,9 +24,23 @@ model Employee {
   fullName  String
   role      String
   phone     String
+  maxUserId String?  @unique
   createdAt DateTime @default(now())
 
   completedWorks CompletedWork[]
+}
+
+// Persists MAX-bot conversation state across webhook requests, rather
+// than holding it in process memory: that would silently break the
+// moment the app runs as more than one instance, and would lose any
+// in-progress dialog (choosing a house, entering a description, etc.)
+// on every restart or deploy. Keyed by the MAX user id, until the entry
+// is submitted or cancelled.
+model MaxBotSession {
+  maxUserId String   @id
+  step      String
+  data      Json     @default("{}")
+  updatedAt DateTime @updatedAt
 }
 
 model CompletedWork {
