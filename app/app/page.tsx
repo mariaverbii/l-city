@@ -98,7 +98,13 @@ export default async function Home({
       orderBy: { id: "asc" },
     }),
     db.employee.findMany({
-      select: { id: true, fullName: true, role: true, phone: true },
+      select: {
+        id: true,
+        fullName: true,
+        role: true,
+        phone: true,
+        maxUserId: true,
+      },
       orderBy: { id: "asc" },
     }),
     db.completedWork.findMany({
