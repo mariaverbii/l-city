@@ -794,3 +794,22 @@ h2 {
     break-inside: avoid;
   }
 }
+
+.max-badge {
+  align-self: flex-start;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 10px;
+  white-space: nowrap;
+}
+
+.max-linked {
+  background: #eaf8f0;
+  color: #287a4a;
+}
+
+.max-not-linked {
+  background: #f0f3f7;
+  color: var(--muted);
+}
