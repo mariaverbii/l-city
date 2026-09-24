@@ -41,6 +41,97 @@ const LIMITS = {
   materials: 1000,
 };
 
+// Real, sourced categories of housing-management work (based on an actual
+// management company's public legally-required service-disclosure list),
+// trimmed to the physical, on-site work a field employee actually performs
+// and logs via the bot — office/administrative items (billing, contracts,
+// paperwork) are intentionally left out since employees never handle those.
+// Every category ends with an implicit "Другое" button (added when the
+// keyboard is built) so nothing is ever a dead end.
+type WorkCategory = { label: string; subtypes: string[] };
+
+const WORK_CATEGORIES: WorkCategory[] = [
+  {
+    label: "Сантехника",
+    subtypes: [
+      "Устранение засора",
+      "Устранение протечки",
+      "Ремонт/замена запорной арматуры",
+      "Плановый осмотр систем водоснабжения",
+    ],
+  },
+  {
+    label: "Отопление",
+    subtypes: [
+      "Регулировка и промывка радиаторов",
+      "Устранение течи системы отопления",
+      "Подготовка системы к отопительному сезону",
+      "Плановый осмотр системы отопления",
+    ],
+  },
+  {
+    label: "Электрика",
+    subtypes: [
+      "Замена ламп/светильников",
+      "Ремонт электрощитовой",
+      "Устранение неисправности проводки",
+      "Плановый осмотр электрооборудования",
+    ],
+  },
+  {
+    label: "Кровля",
+    subtypes: [
+      "Устранение протечки кровли",
+      "Текущий ремонт кровли",
+      "Ремонт парапета/водостока",
+    ],
+  },
+  {
+    label: "Фасад и конструктив",
+    subtypes: [
+      "Ремонт входной группы (крыльцо, козырёк)",
+      "Ремонт дверей подъезда",
+      "Остекление окон МОП",
+      "Ремонт лестничных клеток",
+      "Заделка швов фасада",
+    ],
+  },
+  {
+    label: "Уборка мест общего пользования",
+    subtypes: ["Уборка подъезда", "Уборка контейнерной площадки", "Вывоз мусора"],
+  },
+  {
+    label: "Благоустройство территории",
+    subtypes: [
+      "Уборка территории",
+      "Покос травы/обрезка кустарников",
+      "Уборка снега/обработка от гололёда",
+      "Ремонт детской площадки",
+    ],
+  },
+  {
+    label: "Дератизация и дезинсекция",
+    subtypes: ["Плановая обработка", "По заявке жителей"],
+  },
+];
+
+const WORK_OTHER_PAYLOAD = "wc:other";
+
+function buildWorkCategoryKeyboard() {
+  const rows = WORK_CATEGORIES.map((c, i) => [Keyboard.button.callback(c.label, `wc:${i}`)]);
+  rows.push([Keyboard.button.callback("Другое", WORK_OTHER_PAYLOAD)]);
+  return Keyboard.inlineKeyboard(rows);
+}
+
+function buildWorkTypeKeyboard(categoryIndex: number) {
+  const category = WORK_CATEGORIES[categoryIndex];
+  const rows = (category?.subtypes ?? []).map((label, j) => [
+    Keyboard.button.callback(label, `wt:${categoryIndex}:${j}`),
+  ]);
+  rows.push([Keyboard.button.callback("Другое", `wt:${categoryIndex}:other`)]);
+  return Keyboard.inlineKeyboard(rows);
+}
+
 type KeyboardAttachment = ReturnType<typeof Keyboard.inlineKeyboard>;
 
 async function send(userId: number, text: string, withKeyboard?: KeyboardAttachment) {
@@ -147,6 +238,11 @@ async function startChoosingHouse(userId: number) {
   await send(userId, buildHouseListText(options));
 }
 
+async function startChoosingWorkCategory(userId: number, data: SessionData) {
+  await setSession(String(userId), "choosing_work_category", data);
+  await send(userId, "Выберите вид работы:", buildWorkCategoryKeyboard());
+}
+
 async function deleteUploadedPhotos(data: SessionData) {
   await Promise.all(
     [data.beforePhotoKey, data.afterPhotoKey]
@@ -249,6 +345,74 @@ async function handlePhotoStep(
   return true;
 }
 
+// Turns the structured (or free-text) work data collected so far into a
+// final, official-sounding description for the record. When an AI key is
+// configured (ANTHROPIC_API_KEY, set by the admin once they have one — see
+// the AI-report feature notes) it asks Claude to phrase it properly; either
+// way a plain, deterministic composition is always available as a fallback,
+// so the bot keeps working even without the key or if the API call fails.
+async function draftDescription(data: SessionData): Promise<string> {
+  const workLabel =
+    data.workCategory && data.workType
+      ? `${data.workCategory} — ${data.workType}`
+      : (data.workType ?? "");
+
+  const fallback = [
+    workLabel,
+    data.location,
+    data.volume ? `объём: ${data.volume}` : "",
+    data.materials ? `материалы: ${data.materials}` : "материалы не использовались",
+  ]
+    .filter(Boolean)
+    .join(". ");
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+
+  if (!apiKey) {
+    return fallback;
+  }
+
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-3-5-haiku-20241022",
+        max_tokens: 200,
+        messages: [
+          {
+            role: "user",
+            content:
+              "Составь краткое официальное описание выполненной работы для акта управляющей компании " +
+              "(1-2 предложения, деловым стилем, без лишних слов, на русском языке). " +
+              `Вид работы: ${workLabel || "не указан"}. ` +
+              `Место: ${data.location ?? "не указано"}. ` +
+              `Объём: ${data.volume ?? "не указан"}. ` +
+              `Материалы: ${data.materials || "не использовались"}. ` +
+              "Ответь только текстом описания, без пояснений и кавычек.",
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      return fallback;
+    }
+
+    const json = (await response.json()) as {
+      content?: { type: string; text?: string }[];
+    };
+    const text = json.content?.find((b) => b.type === "text")?.text?.trim();
+    return text || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 function buildSummary(data: SessionData): string {
   return [
     "Проверьте данные записи:",
@@ -295,6 +459,19 @@ async function finalizeEntry(userId: number, employeeId: number, data: SessionDa
   } catch {
     await send(userId, "Не удалось сохранить запись, попробуйте ещё раз.");
   }
+}
+
+async function goToConfirming(userId: number, data: SessionData) {
+  // Only run the AI/deterministic drafting when the work type was picked
+  // via buttons (structured data) — if the employee chose "Другое" and
+  // typed their own description, that's respected as-is rather than
+  // rephrased out from under them.
+  if (data.workType) {
+    data.description = await draftDescription(data);
+  }
+
+  await setSession(String(userId), "confirming", data);
+  await send(userId, buildSummary(data), CONFIRM_KEYBOARD);
 }
 
 async function handleLinkedMessage(
@@ -349,8 +526,29 @@ async function handleLinkedMessage(
 
       data.houseId = match.id;
       data.houseAddress = shortHouseLabel(match.address);
-      await setSession(String(userId), "entering_description", data);
-      await send(userId, "Опишите выполненную работу.");
+      await startChoosingWorkCategory(userId, data);
+      return;
+    }
+
+    // These two steps are driven by tapping inline-keyboard buttons
+    // (handled in handleCallback below); a stray text message here just
+    // gets the same keyboard re-sent.
+    case "choosing_work_category": {
+      await send(userId, "Выберите вид работы, нажав на кнопку:", buildWorkCategoryKeyboard());
+      return;
+    }
+
+    case "choosing_work_type": {
+      const categoryIndex = data.workCategoryIndex ?? -1;
+      if (!WORK_CATEGORIES[categoryIndex]) {
+        await startChoosingWorkCategory(userId, data);
+        return;
+      }
+      await send(
+        userId,
+        "Выберите вид работы, нажав на кнопку:",
+        buildWorkTypeKeyboard(categoryIndex),
+      );
       return;
     }
 
@@ -426,8 +624,7 @@ async function handleLinkedMessage(
         return;
       }
 
-      await setSession(String(userId), "confirming", data);
-      await send(userId, buildSummary(data), CONFIRM_KEYBOARD);
+      await goToConfirming(userId, data);
       return;
     }
 
@@ -478,9 +675,82 @@ async function handleMessageCreated(message: Message) {
   await handleLinkedMessage(senderId, employee.id, message);
 }
 
+async function handleWorkCategoryCallback(senderId: number, payload: string) {
+  const session = await getSession(String(senderId));
+
+  if (!session) {
+    await showMenu(senderId);
+    return;
+  }
+
+  const data = session.data;
+  const rest = payload.slice("wc:".length);
+
+  if (rest === "other") {
+    await setSession(String(senderId), "entering_description", data);
+    await send(senderId, "Опишите выполненную работу.");
+    return;
+  }
+
+  const categoryIndex = Number(rest);
+  const category = WORK_CATEGORIES[categoryIndex];
+
+  if (!Number.isInteger(categoryIndex) || !category) {
+    await send(senderId, "Выберите вид работы:", buildWorkCategoryKeyboard());
+    return;
+  }
+
+  data.workCategoryIndex = categoryIndex;
+  await setSession(String(senderId), "choosing_work_type", data);
+  await send(
+    senderId,
+    `Категория: ${category.label}\nВыберите вид работы:`,
+    buildWorkTypeKeyboard(categoryIndex),
+  );
+}
+
+async function handleWorkTypeCallback(senderId: number, payload: string) {
+  const session = await getSession(String(senderId));
+
+  if (!session) {
+    await showMenu(senderId);
+    return;
+  }
+
+  const data = session.data;
+  const [, catStr, subStr] = payload.split(":");
+  const categoryIndex = Number(catStr);
+  const category = WORK_CATEGORIES[categoryIndex];
+
+  if (!category) {
+    await send(senderId, "Выберите вид работы:", buildWorkCategoryKeyboard());
+    return;
+  }
+
+  if (subStr === "other") {
+    data.workCategory = category.label;
+    await setSession(String(senderId), "entering_description", data);
+    await send(senderId, `Категория: ${category.label}. Опишите выполненную работу.`);
+    return;
+  }
+
+  const subIndex = Number(subStr);
+  const subtype = category.subtypes[subIndex];
+
+  if (!Number.isInteger(subIndex) || !subtype) {
+    await send(senderId, "Выберите вид работы:", buildWorkTypeKeyboard(categoryIndex));
+    return;
+  }
+
+  data.workCategory = category.label;
+  data.workType = subtype;
+  await setSession(String(senderId), "entering_location", data);
+  await send(senderId, "Укажите место проведения работ (например: подъезд 2, этаж 3).");
+}
+
 async function handleCallback(update: Extract<Update, { update_type: "message_callback" }>) {
   const senderId = update.callback.user.user_id;
-  const payload = update.callback.payload;
+  const payload = update.callback.payload ?? "";
   const employee = await findEmployeeByMaxUserId(senderId);
 
   if (!employee) {
@@ -493,6 +763,16 @@ async function handleCallback(update: Extract<Update, { update_type: "message_ca
 
   if (payload === "start_new_work") {
     await startChoosingHouse(senderId);
+    return;
+  }
+
+  if (payload.startsWith("wc:")) {
+    await handleWorkCategoryCallback(senderId, payload);
+    return;
+  }
+
+  if (payload.startsWith("wt:")) {
+    await handleWorkTypeCallback(senderId, payload);
     return;
   }
 
