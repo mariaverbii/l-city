@@ -114,8 +114,18 @@ async function askForContact(userId: number, greeting: string) {
   await send(userId, greeting, CONTACT_KEYBOARD);
 }
 
+// Houses are stored with their full postal address (region, district,
+// village, street, house number) because the acts/reports module will
+// need that later. Employees only need the street + house number to
+// recognize which building is meant, so the bot shows just that part
+// while the full address stays in the database untouched.
+function shortHouseLabel(fullAddress: string): string {
+  const match = fullAddress.match(/ул\.\s*[^,]+,\s*д\.\s*\S+/i);
+  return match ? match[0] : fullAddress;
+}
+
 function buildHouseListText(options: HouseOption[]): string {
-  const lines = options.map((o) => `${o.index}. ${o.address}`);
+  const lines = options.map((o) => `${o.index}. ${shortHouseLabel(o.address)}`);
   return `Выберите дом (отправьте номер из списка):\n\n${lines.join("\n")}`;
 }
 
@@ -325,7 +335,11 @@ async function handleLinkedMessage(
       }
 
       if (!match && text) {
-        match = options.find((o) => o.address.toLowerCase().includes(lower));
+        match = options.find(
+          (o) =>
+            o.address.toLowerCase().includes(lower) ||
+            shortHouseLabel(o.address).toLowerCase().includes(lower),
+        );
       }
 
       if (!match) {
@@ -334,7 +348,7 @@ async function handleLinkedMessage(
       }
 
       data.houseId = match.id;
-      data.houseAddress = match.address;
+      data.houseAddress = shortHouseLabel(match.address);
       await setSession(String(userId), "entering_description", data);
       await send(userId, "Опишите выполненную работу.");
       return;
