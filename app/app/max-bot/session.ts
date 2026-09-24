@@ -12,6 +12,8 @@ export type SessionStep =
   | "awaiting_contact"
   | "menu"
   | "choosing_house"
+  | "choosing_work_category"
+  | "choosing_work_type"
   | "entering_description"
   | "entering_location"
   | "entering_volume"
@@ -26,6 +28,9 @@ export type SessionData = {
   houseOptions?: HouseOption[];
   houseId?: number;
   houseAddress?: string;
+  workCategoryIndex?: number;
+  workCategory?: string;
+  workType?: string;
   description?: string;
   location?: string;
   volume?: string;
