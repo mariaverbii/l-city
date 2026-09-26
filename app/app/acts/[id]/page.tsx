@@ -305,6 +305,7 @@ export default async function ActPage({
           Настоящий Акт составлен в 2-х экземплярах, имеющих одинаковую
           юридическую силу, по одному для каждой из Сторон.
         </p>
+        
         <p className="act-print-center">Подписи Сторон:</p>
 
         <table className="act-print-signatures">
