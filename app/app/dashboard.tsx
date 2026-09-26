@@ -448,9 +448,10 @@ export default function Dashboard({
           Акты
         </Link>
       </nav>
-      
+
       {message && <p className="feedback success">{message}</p>}
-            {error && <p className="feedback error">{error}</p>}
+      {error && <p className="feedback error">{error}</p>}
+
       {activeTab === "houses" ? (
         <section className="content-grid" aria-labelledby="houses-heading">
           <div className="form-card">
