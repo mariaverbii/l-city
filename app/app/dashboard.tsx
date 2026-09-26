@@ -2,6 +2,7 @@
 
 import { FormEvent, useState, useTransition } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   createEmployee,
@@ -443,11 +444,13 @@ export default function Dashboard({
           Выполненные работы
           <span className="tab-count">{completedWorks.length}</span>
         </button>
+        <Link className="tab" href="/acts">
+          Акты
+        </Link>
       </nav>
-
+      
       {message && <p className="feedback success">{message}</p>}
-      {error && <p className="feedback error">{error}</p>}
-
+            {error && <p className="feedback error">{error}</p>}
       {activeTab === "houses" ? (
         <section className="content-grid" aria-labelledby="houses-heading">
           <div className="form-card">
