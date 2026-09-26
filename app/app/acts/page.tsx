@@ -85,7 +85,7 @@ export default async function ActsPage() {
             <label className="field-label" htmlFor="new-act-from">
               Период с
             </label>
-                        <input className="text-input" id="new-act-from" name="periodFrom" required type="date" />
+            <input className="text-input" id="new-act-from" name="periodFrom" required type="date" />
           </div>
           <div>
             <label className="field-label" htmlFor="new-act-to">
