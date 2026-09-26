@@ -71,7 +71,7 @@ model CompletedWork {
 
 // "Акт приемки оказанных услуг и (или) выполненных работ" — the official
 // form per приказ Минстроя №761/пр от 26.10.2015 (form unchanged by приказ
-// №318/пр, который from 01.09.2026 only regulates the drafting/signing
+// №318/пр, which from 01.09.2026 only regulates the drafting/signing
 // procedure and deadlines, not the form itself — see
 // docs/regulatory/prikaz-761pr-akt-form.txt for the verbatim text this
 // model and the print view are built from).
