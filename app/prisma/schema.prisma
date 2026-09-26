@@ -17,6 +17,7 @@ model House {
   createdAt DateTime @default(now())
 
   completedWorks CompletedWork[]
+  acts           Act[]
 }
 
 model Employee {
@@ -62,7 +63,109 @@ model CompletedWork {
 
   house    House    @relation(fields: [houseId], references: [id], onDelete: Restrict)
   employee Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  actLineItem ActLineItem?
 
   @@index([houseId])
   @@index([employeeId])
+}
+
+// "Акт приемки оказанных услуг и (или) выполненных работ" — the official
+// form per приказ Минстроя №761/пр от 26.10.2015 (form unchanged by приказ
+// №318/пр, который from 01.09.2026 only regulates the drafting/signing
+// procedure and deadlines, not the form itself — see
+// docs/regulatory/prikaz-761pr-akt-form.txt for the verbatim text this
+// model and the print view are built from).
+//
+// status: "draft" (being assembled/edited) -> "ready" (all required fields
+// present, printable/exportable, still editable) -> "signed" (director has
+// recorded it as physically signed; kept for the record, no longer edited).
+model Act {
+  id        Int      @id @default(autoincrement())
+  houseId   Int
+  number    String? // "АКТ N ___"
+  signCity  String   @default("д. Лаголово") // "г. ___" — where the act itself is executed/signed
+
+  periodFrom DateTime
+  periodTo   DateTime
+
+  // "Заказчик" — the owner or council-chair party signing on behalf of the
+  // homeowners (форма акта, преамбула).
+  customerName      String? // ФИО
+  customerBasis     String? // "действующего на основании ..." (решение общего собрания / доверенность, дата, номер)
+  customerApartment String? // "являющегося собственником квартиры N ___" — filled when подписант is the council chair
+
+  // "Договор" this act's works were performed under.
+  agreementNumber String?
+  agreementDate   DateTime?
+
+  // "Исполнитель" — ООО «Л-Сити», represented by a specific person for
+  // this act's signature block.
+  contractorName        String  @default("ООО «Л-Сити»")
+  contractorPersonName  String? // "должность, ФИО"
+  contractorPersonRole  String?
+
+  status   String    @default("draft")
+  signedAt DateTime?
+
+  // Denormalized sum of lineItems.totalCostKopecks, kept in sync by the
+  // server actions that add/remove/edit line items — avoids recomputing it
+  // on every read (the print page still recomputes and cross-checks it).
+  totalKopecks Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  house     House         @relation(fields: [houseId], references: [id], onDelete: Restrict)
+  lineItems ActLineItem[]
+  changeLogEntries ActChangeLogEntry[]
+
+  @@index([houseId])
+}
+
+// One row of the act's 5-column table. Normally created from a single
+// confirmed CompletedWork entry (completedWorkId set) — the reliable,
+// auditable case. workName/periodicity are seeded from that record but
+// stay editable since the act's wording doesn't have to be identical to
+// the internal work-log text; unit/unitCostKopecks are never auto-filled
+// (CompletedWork doesn't capture a structured quantity+unit today), so they
+// start empty and are tracked as "needs review" until someone fills them in.
+model ActLineItem {
+  id     Int @id @default(autoincrement())
+  actId  Int
+
+  completedWorkId Int? @unique
+
+  workName   String // "Наименование вида работы (услуги)"
+  periodicity String // "Периодичность/количественный показатель выполненной работы"
+  unit             String? // "Единица измерения" — manual, null = needs review
+  unitCostKopecks  Int? // "Стоимость / сметная стоимость ... за единицу" — manual, null = needs review
+
+  // "Цена выполненной работы (оказанной услуги), в рублях" — must trace to
+  // a costConfirmed CompletedWork; see addWorksToAct in acts.ts.
+  totalCostKopecks Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  act           Act            @relation(fields: [actId], references: [id], onDelete: Cascade)
+  completedWork CompletedWork? @relation(fields: [completedWorkId], references: [id], onDelete: SetNull)
+
+  @@index([actId])
+}
+
+// Audit trail for manual edits to an act's cost-bearing fields, per the
+// "не гадать / всё прослеживаемо" requirement — who changed what, from what
+// value to what value, and when. Written by the server actions, never by
+// the UI directly.
+model ActChangeLogEntry {
+  id        Int      @id @default(autoincrement())
+  actId     Int
+  field     String // e.g. "lineItem.unitCostKopecks", "lineItem.totalCostKopecks", "act.number"
+  oldValue  String?
+  newValue  String?
+  createdAt DateTime @default(now())
+
+  act Act @relation(fields: [actId], references: [id], onDelete: Cascade)
+
+  @@index([actId])
 }
