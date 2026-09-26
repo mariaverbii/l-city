@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { db } from "../db";
 
+// Force dynamic rendering: this page queries the database directly and has
+// no dynamic API (no searchParams) to trigger that automatically. Without
+// this, Next.js tries to statically prerender it at build time, when the
+// build server cannot reach the database — causing the build to time out.
+export const dynamic = "force-dynamic";
+
 function formatDate(date: Date) {
   return new Intl.DateTimeFormat("ru-RU", {
     day: "2-digit",
