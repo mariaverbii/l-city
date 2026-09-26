@@ -813,3 +813,210 @@ h2 {
   background: #f0f3f7;
   color: var(--muted);
 }
+/* Акты (761/пр) */
+
+.act-toolbar {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.act-status-controls {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.act-status-badge {
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 14px;
+  white-space: nowrap;
+}
+
+.act-status-draft {
+  background: #f0f3f7;
+  color: var(--muted);
+}
+
+.act-status-ready {
+  background: #fff6e0;
+  color: #93700a;
+}
+
+.act-status-signed {
+  background: #eaf8f0;
+  color: #287a4a;
+}
+
+.act-line-item-row {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.act-line-item-form {
+  align-items: end;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 2fr 1.4fr 1fr 1fr auto auto;
+  width: 100%;
+}
+
+.act-line-item-total {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.act-line-item-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.act-line-item-warning {
+  color: #93700a;
+  font-size: 12px;
+  margin: 6px 0 0;
+}
+
+.report-total-inline {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.change-log {
+  font-size: 13px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.change-log li {
+  border-bottom: 1px solid var(--line);
+  padding: 8px 0;
+}
+
+.change-log li:last-child {
+  border-bottom: none;
+}
+
+.change-log-field {
+  color: var(--muted);
+  font-family: var(--font-mono, monospace);
+}
+
+.change-log-old {
+  color: var(--red);
+}
+
+.change-log-new {
+  color: #287a4a;
+  font-weight: 700;
+}
+
+.change-log-date {
+  color: var(--muted);
+}
+
+/* Печатная форма акта — точная структура по приказу №761/пр */
+
+.act-print-sheet {
+  background: #fff;
+  color: #1a1a1a;
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0 auto;
+  max-width: 900px;
+  padding: 40px 32px 60px;
+}
+
+.act-print-title {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0 0 20px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.act-print-center {
+  font-weight: 700;
+  margin: 0 0 16px;
+  text-align: center;
+}
+
+.act-print-dateline {
+  display: flex;
+  justify-content: space-between;
+  margin: 0 0 16px;
+}
+
+.act-print-fill {
+  border-bottom: 1px solid #1a1a1a;
+  padding: 0 2px;
+}
+
+.act-print-table {
+  border-collapse: collapse;
+  font-size: 12px;
+  margin: 16px 0;
+  width: 100%;
+}
+
+.act-print-table th,
+.act-print-table td {
+  border: 1px solid #1a1a1a;
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.act-print-table th {
+  background: #f0f3f7;
+  font-weight: 700;
+}
+
+.act-print-empty {
+  color: var(--muted);
+  text-align: center;
+}
+
+.act-print-signatures {
+  border-collapse: collapse;
+  margin: 20px 0;
+  width: 100%;
+}
+
+.act-print-signatures td {
+  padding: 4px 8px 4px 0;
+}
+
+.act-print-hint {
+  color: var(--muted);
+  font-size: 10px;
+  padding-top: 0;
+  text-align: center;
+}
+
+.act-print-note {
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 24px;
+}
+
+@media print {
+  .act-print-sheet {
+    max-width: none;
+    padding: 0;
+  }
+
+  .act-print-table {
+    break-inside: auto;
+  }
+
+  .act-print-table tr {
+    break-inside: avoid;
+  }
+}
