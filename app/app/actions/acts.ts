@@ -84,7 +84,7 @@ async function assertActEditable(actId: number) {
 // Validates a set of CompletedWork ids against the "только подтверждённая
 // стоимость" rule before they become act line items — the same principle
 // Мария specified for the Годовой отчёт, applied here too: an act is an
-// official document, so every line in it has to trace to a cost that was
+// официальный документ, so every line in it has to trace to a cost that was
 // actually confirmed, never a calculated-but-unconfirmed figure.
 async function validateWorksForAct(houseId: number, workIds: number[]) {
   const works = await db.completedWork.findMany({
@@ -170,9 +170,26 @@ export async function createAct(formData: FormData): Promise<CreateActResult> {
 
   try {
     const act = await db.$transaction(async (tx) => {
+      // Номер акта — автоматически по порядку, отдельно для каждого дома и
+      // заново с 1 в каждом календарном году (по году начала периода акта),
+      // как попросила Мария. Считается внутри транзакции, чтобы два акта
+      // не могли одновременно получить один и тот же номер. Поле остаётся
+      // редактируемым — это только стартовое значение.
+      const periodYear = periodFrom.getUTCFullYear();
+      const actsThisYearForHouse = await tx.act.count({
+        where: {
+          houseId,
+          periodFrom: {
+            gte: new Date(Date.UTC(periodYear, 0, 1)),
+            lt: new Date(Date.UTC(periodYear + 1, 0, 1)),
+          },
+        },
+      });
+
       const created = await tx.act.create({
         data: {
           houseId,
+          number: String(actsThisYearForHouse + 1),
           periodFrom,
           periodTo,
           contractorPersonName: optionalText(formData, "contractorPersonName", 200),
