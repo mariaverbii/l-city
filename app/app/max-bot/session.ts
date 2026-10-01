@@ -32,6 +32,8 @@ export type SessionData = {
   workCategory?: string;
   workType?: string;
   description?: string;
+  descriptionOriginal?: string;
+  costSuggestedKopecks?: number;
   location?: string;
   volume?: string;
   materials?: string;
