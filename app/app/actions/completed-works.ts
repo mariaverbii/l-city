@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { db } from "../db";
 import { storage } from "../storage";
+import { analyzeCompletedWork } from "../ai";
 
 const MAX_PHOTO_SIZE = 10 * 1024 * 1024;
 const allowedPhotoTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -160,9 +161,24 @@ export async function createCompletedWork(
     beforePhoto = await uploadPhoto(getPhoto(formData, "beforePhoto"), "before");
     afterPhoto = await uploadPhoto(getPhoto(formData, "afterPhoto"), "after");
 
+    // Best-effort ИИ clean-up of the description + a cost estimate — see
+    // app/ai.ts. The employee's own wording is always kept in
+    // descriptionOriginal; `description` becomes the ИИ-polished version
+    // only when ИИ actually returned one, otherwise it stays the original
+    // text (e.g. ANTHROPIC_API_KEY not configured yet).
+    const aiResult = await analyzeCompletedWork({
+      description: validation.data.description,
+      location: validation.data.location,
+      volume: validation.data.volume,
+      materials: validation.data.materials,
+    });
+
     await db.completedWork.create({
       data: {
         ...validation.data,
+        description: aiResult.description ?? validation.data.description,
+        descriptionOriginal: validation.data.description,
+        costSuggestedKopecks: aiResult.costSuggestedKopecks,
         beforePhotoKey: beforePhoto?.key,
         beforePhotoType: beforePhoto?.type,
         afterPhotoKey: afterPhoto?.key,
