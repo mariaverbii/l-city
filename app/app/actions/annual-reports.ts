@@ -11,6 +11,11 @@ export type CreateAnnualReportResult =
   | { ok: true; reportId: number }
   | { ok: false; error: string };
 
+// Разделы 2 (остатки)–5 (начисления) не отслеживаются системой и
+// заполняются вручную уже в скачанном файле отчёта — см. комментарий в
+// prisma/schema.prisma и печатную форму в [id]/page.tsx, поэтому в списке
+// обязательных полей для статуса "ready" участвуют только реквизиты,
+// которые реально вводятся через сайт.
 const REQUIRED_HEADER_FIELDS: Array<{
   key:
     | "orgFullName"
@@ -18,14 +23,7 @@ const REQUIRED_HEADER_FIELDS: Array<{
     | "ogrnOrInn"
     | "contactName"
     | "contactPhone"
-    | "totalAreaSqm"
-    | "repairBalanceOpeningKopecks"
-    | "repairDueFromOwnersKopecks"
-    | "repairBalanceClosingKopecks"
-    | "managementServiceCostKopecks"
-    | "claimsSentCount"
-    | "lawsuitsSentCount"
-    | "recoveredKopecks";
+    | "totalAreaSqm";
   label: string;
 }> = [
   { key: "orgFullName", label: "полное наименование организации" },
@@ -34,13 +32,6 @@ const REQUIRED_HEADER_FIELDS: Array<{
   { key: "contactName", label: "ФИО и должность ответственного лица" },
   { key: "contactPhone", label: "телефон ответственного лица" },
   { key: "totalAreaSqm", label: "общая площадь помещений в доме" },
-  { key: "repairBalanceOpeningKopecks", label: "остаток средств на текущий ремонт на 1 января (Раздел 2)" },
-  { key: "repairDueFromOwnersKopecks", label: "сумма к внесению на текущий ремонт за период (Раздел 2)" },
-  { key: "repairBalanceClosingKopecks", label: "остаток средств на текущий ремонт на 31 декабря (Раздел 2)" },
-  { key: "managementServiceCostKopecks", label: "стоимость услуг по управлению (Раздел 3)" },
-  { key: "claimsSentCount", label: "количество претензий должникам (Раздел 4)" },
-  { key: "lawsuitsSentCount", label: "количество исковых заявлений (Раздел 4)" },
-  { key: "recoveredKopecks", label: "сумма, взысканная принудительно (Раздел 4)" },
 ];
 
 // Простая эвристика "что предложить" для разделения работ между Разделом 1
@@ -94,13 +85,6 @@ function optionalKopecks(formData: FormData, field: string): number | null | "in
   const normalized = raw.replace(",", ".");
   if (!/^\d+(\.\d{1,2})?$/.test(normalized)) return "invalid";
   return Math.round(Number(normalized) * 100);
-}
-
-function optionalInt(formData: FormData, field: string): number | null | "invalid" {
-  const raw = String(formData.get(field) ?? "").trim();
-  if (!raw) return null;
-  if (!/^\d+$/.test(raw)) return "invalid";
-  return Number(raw);
 }
 
 function optionalFloat(formData: FormData, field: string): number | null | "invalid" {
@@ -243,13 +227,6 @@ export async function createAnnualReport(
         }
       }
 
-      await tx.annualReportBillingRow.createMany({
-        data: [
-          { reportId: created.id, category: "owners" },
-          { reportId: created.id, category: "tenants" },
-        ],
-      });
-
       return created;
     });
 
@@ -289,95 +266,6 @@ export async function updateAnnualReportHeader(
     return { ok: true };
   } catch {
     return { ok: false, error: "Не удалось сохранить реквизиты отчёта." };
-  }
-}
-
-export async function updateAnnualReportFinancials(
-  reportId: number,
-  formData: FormData,
-): Promise<AnnualReportActionResult> {
-  const editableError = await assertReportEditable(reportId);
-  if (editableError) return { ok: false, error: editableError };
-
-  const repairBalanceOpeningKopecks = optionalKopecks(formData, "repairBalanceOpeningKopecks");
-  const repairDueFromOwnersKopecks = optionalKopecks(formData, "repairDueFromOwnersKopecks");
-  const repairBalanceClosingKopecks = optionalKopecks(formData, "repairBalanceClosingKopecks");
-  const managementServiceCostKopecks = optionalKopecks(formData, "managementServiceCostKopecks");
-  const claimsSentCount = optionalInt(formData, "claimsSentCount");
-  const lawsuitsSentCount = optionalInt(formData, "lawsuitsSentCount");
-  const recoveredKopecks = optionalKopecks(formData, "recoveredKopecks");
-
-  const values = [
-    repairBalanceOpeningKopecks,
-    repairDueFromOwnersKopecks,
-    repairBalanceClosingKopecks,
-    managementServiceCostKopecks,
-    claimsSentCount,
-    lawsuitsSentCount,
-    recoveredKopecks,
-  ];
-
-  if (values.includes("invalid")) {
-    return { ok: false, error: "Проверьте введённые суммы и количества — где-то некорректное значение." };
-  }
-
-  try {
-    await db.annualReport.update({
-      where: { id: reportId },
-      data: {
-        repairBalanceOpeningKopecks: repairBalanceOpeningKopecks as number | null,
-        repairDueFromOwnersKopecks: repairDueFromOwnersKopecks as number | null,
-        repairBalanceClosingKopecks: repairBalanceClosingKopecks as number | null,
-        managementServiceCostKopecks: managementServiceCostKopecks as number | null,
-        claimsSentCount: claimsSentCount as number | null,
-        lawsuitsSentCount: lawsuitsSentCount as number | null,
-        recoveredKopecks: recoveredKopecks as number | null,
-      },
-    });
-    revalidatePath(`/annual-reports/${reportId}`);
-    return { ok: true };
-  } catch {
-    return { ok: false, error: "Не удалось сохранить финансовые данные отчёта." };
-  }
-}
-
-export async function updateBillingRow(
-  rowId: number,
-  formData: FormData,
-): Promise<AnnualReportActionResult> {
-  const row = await db.annualReportBillingRow.findUnique({
-    where: { id: rowId },
-    select: { reportId: true },
-  });
-
-  if (!row) return { ok: false, error: "Строка не найдена." };
-
-  const editableError = await assertReportEditable(row.reportId);
-  if (editableError) return { ok: false, error: editableError };
-
-  const openingDebtKopecks = optionalKopecks(formData, "openingDebtKopecks");
-  const accruedKopecks = optionalKopecks(formData, "accruedKopecks");
-  const receivedKopecks = optionalKopecks(formData, "receivedKopecks");
-  const closingDebtKopecks = optionalKopecks(formData, "closingDebtKopecks");
-
-  if ([openingDebtKopecks, accruedKopecks, receivedKopecks, closingDebtKopecks].includes("invalid")) {
-    return { ok: false, error: "Проверьте введённые суммы." };
-  }
-
-  try {
-    await db.annualReportBillingRow.update({
-      where: { id: rowId },
-      data: {
-        openingDebtKopecks: openingDebtKopecks as number | null,
-        accruedKopecks: accruedKopecks as number | null,
-        receivedKopecks: receivedKopecks as number | null,
-        closingDebtKopecks: closingDebtKopecks as number | null,
-      },
-    });
-    revalidatePath(`/annual-reports/${row.reportId}`);
-    return { ok: true };
-  } catch {
-    return { ok: false, error: "Не удалось сохранить строку начислений." };
   }
 }
 
@@ -542,7 +430,7 @@ export async function moveRepairItemToMaintenance(itemId: number): Promise<Annua
 export async function setAnnualReportReady(reportId: number): Promise<AnnualReportActionResult> {
   const report = await db.annualReport.findUnique({
     where: { id: reportId },
-    include: { maintenanceItems: true, repairItems: true, billingRows: true },
+    include: { maintenanceItems: true, repairItems: true },
   });
 
   if (!report) return { ok: false, error: "Отчёт не найден." };
@@ -566,18 +454,6 @@ export async function setAnnualReportReady(reportId: number): Promise<AnnualRepo
         unconfirmed === 1 ? "строки" : "строк"
       }`,
     );
-  }
-
-  const billingIncomplete = report.billingRows.some(
-    (row) =>
-      row.openingDebtKopecks === null ||
-      row.accruedKopecks === null ||
-      row.receivedKopecks === null ||
-      row.closingDebtKopecks === null,
-  );
-
-  if (billingIncomplete) {
-    missing.push("начисления и поступления по собственникам/нанимателям (Раздел 5)");
   }
 
   if (missing.length > 0) {
