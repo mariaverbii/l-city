@@ -830,6 +830,16 @@ h2 {
   gap: 10px;
 }
 
+.inline-form {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.inline-form .text-input {
+  width: auto;
+}
+
 .act-status-badge {
   border-radius: 20px;
   font-size: 12px;
