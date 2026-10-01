@@ -541,6 +541,37 @@ h2 {
   width: 120px;
 }
 
+.ai-original {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.ai-original summary {
+  cursor: pointer;
+}
+
+.ai-original span {
+  display: block;
+  margin-top: 4px;
+}
+
+.ai-cost-hint {
+  align-items: center;
+  background: var(--accent-soft, #eef2ff);
+  border-radius: 8px;
+  display: flex;
+  flex: 1 1 100%;
+  font-size: 12px;
+  gap: 8px;
+  padding: 6px 10px;
+}
+
+.ai-cost-hint .text-button {
+  font-size: 12px;
+  padding: 0;
+}
+
 .row-actions {
   align-items: center;
   display: flex;
