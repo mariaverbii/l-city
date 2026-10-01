@@ -39,12 +39,14 @@ type Employee = {
 type CompletedWork = {
   id: number;
   description: string;
+  descriptionOriginal: string | null;
   location: string;
   volume: string;
   materials: string;
   beforePhotoKey: string | null;
   afterPhotoKey: string | null;
   costKopecks: number | null;
+  costSuggestedKopecks: number | null;
   costConfirmed: boolean;
   createdAt: Date;
   house: {
@@ -316,6 +318,14 @@ export default function Dashboard({
       setMessage("Запись о работе удалена.");
       router.refresh();
     });
+  }
+
+  function applySuggestedCost(workId: number, suggestedKopecks: number) {
+    const input = document.getElementById(`cost-${workId}`) as HTMLInputElement | null;
+    if (input) {
+      input.value = (suggestedKopecks / 100).toFixed(2);
+      input.focus();
+    }
   }
 
   function submitWorkCost(work: CompletedWork, event: FormEvent<HTMLFormElement>) {
@@ -1027,6 +1037,13 @@ export default function Dashboard({
                     </div>
                     <div className="record-main work-main">
                       <strong>{work.description}</strong>
+                      {work.descriptionOriginal &&
+                        work.descriptionOriginal !== work.description && (
+                          <details className="ai-original">
+                            <summary>Описание отредактировано ИИ — показать исходный текст</summary>
+                            <span>{work.descriptionOriginal}</span>
+                          </details>
+                        )}
                       <span>
                         {work.house.address} · {work.employee.fullName}
                       </span>
@@ -1095,6 +1112,20 @@ export default function Dashboard({
                             className="cost-form"
                             onSubmit={(event) => submitWorkCost(work, event)}
                           >
+                            {work.costSuggestedKopecks !== null && (
+                              <span className="ai-cost-hint">
+                                Предложено ИИ: {formatCost(work.costSuggestedKopecks)}
+                                <button
+                                  className="text-button"
+                                  onClick={() =>
+                                    applySuggestedCost(work.id, work.costSuggestedKopecks!)
+                                  }
+                                  type="button"
+                                >
+                                  Использовать
+                                </button>
+                              </span>
+                            )}
                             <label
                               className="sr-only"
                               htmlFor={`cost-${work.id}`}
