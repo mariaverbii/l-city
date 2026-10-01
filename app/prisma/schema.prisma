@@ -18,6 +18,7 @@ model House {
 
   completedWorks CompletedWork[]
   acts           Act[]
+  annualReports  AnnualReport[]
 }
 
 model Employee {
@@ -64,6 +65,8 @@ model CompletedWork {
   house    House    @relation(fields: [houseId], references: [id], onDelete: Restrict)
   employee Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
   actLineItem ActLineItem?
+  annualReportMaintenanceItem AnnualReportMaintenanceItem?
+  annualReportRepairItem      AnnualReportRepairItem?
 
   @@index([houseId])
   @@index([employeeId])
@@ -168,4 +171,121 @@ model ActChangeLogEntry {
   act Act @relation(fields: [actId], references: [id], onDelete: Cascade)
 
   @@index([actId])
+}
+
+// "Отчёт о деятельности по управлению многоквартирным домом" — приказ
+// Минстроя №728/пр от 20.11.2025 (Минюст №84362, вступил в силу 01.03.2026).
+// Дословный текст формы и перечня обязательных сведений:
+// docs/regulatory/prikaz-728pr-godovoy-otchet.md — оттуда взяты подписи
+// полей ниже и в дочерних моделях; при печати сверяться с этим файлом, а не
+// "по памяти".
+//
+// Система не ведёт отдельно план работ (только факт), учёт
+// должников/претензий/исков и учёт начислений и платежей жителей — поэтому
+// поля Разделов 3-5 и остатки по текущему ремонту в Разделе 2 заполняются
+// вручную (см. соответствующие поля ниже), план в Разделе 1 по умолчанию
+// равен факту. Классификация работы между Разделом 1 (содержание) и
+// Разделом 2 (текущий ремонт) предлагается автоматически при сборке отчёта
+// (см. classifyWork в actions/annual-reports.ts), но требует подтверждения
+// по каждой строке (categoryConfirmed) — отчёт нельзя перевести в "ready",
+// пока не все строки подтверждены, аналогично REQUIRED_HEADER_FIELDS у Act.
+//
+// status: "draft" -> "ready" -> "published" (дата публикации — publishedAt,
+// это и есть "Дата размещения отчета" в шапке формы).
+model AnnualReport {
+  id      Int @id @default(autoincrement())
+  houseId Int
+  year    Int // "за ______ год"
+
+  status      String    @default("draft")
+  publishedAt DateTime?
+
+  // Шапка формы — реквизиты компании подставляются значениями из самого
+  // свежего другого отчёта при создании (чтобы не вводить заново для
+  // каждого дома), но хранятся в каждом отчёте отдельно — это снимок на
+  // момент публикации, как totalKopecks у Act.
+  orgFullName      String? @default("ООО «Л-Сити»")
+  receptionAddress String? // "адрес места приёма населения..."
+  ogrnOrInn        String? // "ОГРН/ИНН"
+  contactName      String? // "ФИО, должность" уполномоченного давать разъяснения
+  contactPhone     String?
+  contactEmail     String?
+  totalAreaSqm     Float? // "Общая площадь жилых и нежилых помещений... м2"
+
+  // Разделы 2 (остатки на ремонт) – 5 (начисления и поступления) не
+  // отслеживаются системой (данных для них нет — ни в completed work, ни
+  // где-либо ещё) и заполняются вручную бухгалтером уже в скачанном файле
+  // отчёта, поэтому в базе не хранятся — см. печатную форму в
+  // app/annual-reports/[id]/page.tsx.
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  house            House                          @relation(fields: [houseId], references: [id], onDelete: Restrict)
+  maintenanceItems AnnualReportMaintenanceItem[]
+  repairItems      AnnualReportRepairItem[]
+
+  @@unique([houseId, year])
+  @@index([houseId])
+}
+
+// Раздел 1 — работы по содержанию общего имущества. planQuantity/planCost
+// ("по перечню работ (услуг)") заполняются тем же значением, что и
+// actualQuantity/actualCost ("выполнено") при создании строки, так как в
+// системе нет отдельной сметы/плана — оба поля остаются независимо
+// редактируемыми на случай, если Мария их позже разделит вручную.
+model AnnualReportMaintenanceItem {
+  id       Int @id @default(autoincrement())
+  reportId Int
+
+  completedWorkId Int? @unique
+
+  workName         String // "Наименование работы (услуги)"
+  unit             String? // "Единица измерения работы (услуги)"
+  unitPriceKopecks Int? // "Цена (стоимость) единицы работы (услуги), руб."
+
+  planQuantity    Float?
+  planCostKopecks Int?
+
+  actualQuantity    Float?
+  actualCostKopecks Int?
+
+  // Подтверждает, что строка верно отнесена к "содержанию" (не к текущему
+  // ремонту) — см. комментарий на AnnualReport про статус "ready".
+  categoryConfirmed Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  report        AnnualReport   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  completedWork CompletedWork? @relation(fields: [completedWorkId], references: [id], onDelete: SetNull)
+
+  @@index([reportId])
+}
+
+// Раздел 2 — работы по текущему ремонту. actReference подставляется из
+// связанного Act (если завершённая работа уже включена в акт с номером) —
+// единственное поле этой модели, которое система может заполнить
+// достоверно сама, без ввода вручную.
+model AnnualReportRepairItem {
+  id       Int @id @default(autoincrement())
+  reportId Int
+
+  completedWorkId Int? @unique
+
+  workName       String // "Наименование работы"
+  basis          String? // "Основание проведения работы"
+  costKopecks    Int // "Стоимость работы по текущему ремонту..."
+  volumeWithUnit String? // "Объем выполненных работ с единицами измерения"
+  actReference   String? // "Реквизиты акта выполненных работ или адрес сайта..."
+
+  categoryConfirmed Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  report        AnnualReport   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  completedWork CompletedWork? @relation(fields: [completedWorkId], references: [id], onDelete: SetNull)
+
+  @@index([reportId])
 }
