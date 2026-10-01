@@ -50,6 +50,7 @@ model CompletedWork {
   houseId         Int
   employeeId      Int
   description     String
+  descriptionOriginal String? // raw text as entered by the employee, before any ИИ clean-up — kept so the AI-edited description (above) never silently loses the original wording; null if ИИ was unavailable (ANTHROPIC_API_KEY not set) when the record was created, in which case `description` IS the original text
   location        String
   volume          String
   materials       String
@@ -58,6 +59,7 @@ model CompletedWork {
   afterPhotoKey   String?
   afterPhotoType  String?
   costKopecks     Int?
+  costSuggestedKopecks Int? // ИИ's cost estimate — a hint only, never auto-applied; office staff may copy it into costKopecks, which still requires the normal confirmation step
   costConfirmed   Boolean   @default(false)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
