@@ -447,6 +447,9 @@ export default function Dashboard({
         <Link className="tab" href="/acts">
           Акты
         </Link>
+        <Link className="tab" href="/annual-reports">
+          Годовые отчёты
+        </Link>
       </nav>
 
       {message && <p className="feedback success">{message}</p>}
