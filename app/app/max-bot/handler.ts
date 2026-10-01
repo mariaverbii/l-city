@@ -1,5 +1,6 @@
 import { db } from "../db";
 import { storage } from "../storage";
+import { analyzeCompletedWork } from "../ai";
 import { getBot, Keyboard, isWebhookSecretValid } from "./client";
 import {
   clearSession,
@@ -346,18 +347,29 @@ async function handlePhotoStep(
 }
 
 // Turns the structured (or free-text) work data collected so far into a
-// final, official-sounding description for the record. When an AI key is
-// configured (ANTHROPIC_API_KEY, set by the admin once they have one — see
-// the AI-report feature notes) it asks Claude to phrase it properly; either
-// way a plain, deterministic composition is always available as a fallback,
-// so the bot keeps working even without the key or if the API call fails.
-async function draftDescription(data: SessionData): Promise<string> {
+// final, official-sounding description for the record, and gets a cost
+// estimate alongside it — via the same shared app/ai.ts helper the web
+// panel uses, so both paths behave identically. A plain, deterministic
+// composition is always available as a fallback description, so the bot
+// keeps working even without ANTHROPIC_API_KEY configured or if the API
+// call fails; descriptionOriginal is set to whatever text this fallback
+// would have been, so the employee's actual input is never lost even when
+// ИИ does rewrite it.
+async function draftDescription(
+  data: SessionData,
+): Promise<{ description: string; descriptionOriginal: string; costSuggestedKopecks: number | null }> {
   const workLabel =
     data.workCategory && data.workType
       ? `${data.workCategory} — ${data.workType}`
       : (data.workType ?? "");
 
-  const fallback = [
+  // For the structured (button-driven) path there's no free-text the
+  // employee typed for the description itself, so this deterministic
+  // composition doubles as "the original" — same text used as the fallback
+  // when ИИ is unavailable. For the free-text ("Другое") path, the
+  // employee's own typed description (already in data.description at this
+  // point) is the original instead.
+  const composed = [
     workLabel,
     data.location,
     data.volume ? `объём: ${data.volume}` : "",
@@ -366,51 +378,21 @@ async function draftDescription(data: SessionData): Promise<string> {
     .filter(Boolean)
     .join(". ");
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const descriptionOriginal = data.workType ? composed : (data.description ?? composed);
+  const fallback = data.description || composed;
 
-  if (!apiKey) {
-    return fallback;
-  }
+  const aiResult = await analyzeCompletedWork({
+    description: descriptionOriginal,
+    location: data.location ?? "",
+    volume: data.volume ?? "",
+    materials: data.materials ?? "",
+  });
 
-  try {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-3-5-haiku-20241022",
-        max_tokens: 200,
-        messages: [
-          {
-            role: "user",
-            content:
-              "Составь краткое официальное описание выполненной работы для акта управляющей компании " +
-              "(1-2 предложения, деловым стилем, без лишних слов, на русском языке). " +
-              `Вид работы: ${workLabel || "не указан"}. ` +
-              `Место: ${data.location ?? "не указано"}. ` +
-              `Объём: ${data.volume ?? "не указан"}. ` +
-              `Материалы: ${data.materials || "не использовались"}. ` +
-              "Ответь только текстом описания, без пояснений и кавычек.",
-          },
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      return fallback;
-    }
-
-    const json = (await response.json()) as {
-      content?: { type: string; text?: string }[];
-    };
-    const text = json.content?.find((b) => b.type === "text")?.text?.trim();
-    return text || fallback;
-  } catch {
-    return fallback;
-  }
+  return {
+    description: aiResult.description || fallback,
+    descriptionOriginal,
+    costSuggestedKopecks: aiResult.costSuggestedKopecks,
+  };
 }
 
 function buildSummary(data: SessionData): string {
@@ -443,6 +425,7 @@ async function finalizeEntry(userId: number, employeeId: number, data: SessionDa
         houseId: data.houseId,
         employeeId,
         description: data.description,
+        descriptionOriginal: data.descriptionOriginal ?? data.description,
         location: data.location,
         volume: data.volume,
         materials: data.materials ?? "",
@@ -450,6 +433,7 @@ async function finalizeEntry(userId: number, employeeId: number, data: SessionDa
         beforePhotoType: data.beforePhotoType,
         afterPhotoKey: data.afterPhotoKey,
         afterPhotoType: data.afterPhotoType,
+        costSuggestedKopecks: data.costSuggestedKopecks ?? null,
       },
     });
 
@@ -462,13 +446,15 @@ async function finalizeEntry(userId: number, employeeId: number, data: SessionDa
 }
 
 async function goToConfirming(userId: number, data: SessionData) {
-  // Only run the AI/deterministic drafting when the work type was picked
-  // via buttons (structured data) — if the employee chose "Другое" and
-  // typed their own description, that's respected as-is rather than
-  // rephrased out from under them.
-  if (data.workType) {
-    data.description = await draftDescription(data);
-  }
+  // Runs for both paths now (structured buttons AND free-text "Другое") —
+  // see draftDescription above for how the original text is preserved in
+  // either case. The employee never sees the cost estimate (it's saved
+  // silently for office staff to review on the web panel), matching the
+  // "employee never enters/sees cost" rule.
+  const drafted = await draftDescription(data);
+  data.description = drafted.description;
+  data.descriptionOriginal = drafted.descriptionOriginal;
+  data.costSuggestedKopecks = drafted.costSuggestedKopecks ?? undefined;
 
   await setSession(String(userId), "confirming", data);
   await send(userId, buildSummary(data), CONFIRM_KEYBOARD);
