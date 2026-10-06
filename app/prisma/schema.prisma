@@ -50,7 +50,7 @@ model CompletedWork {
   houseId         Int
   employeeId      Int
   description     String
-  descriptionOriginal String? // raw text as entered by the employee, before any ИИ clean-up — kept so the AI-edited description (above) never silently loses the original wording; null if ИИ was unavailable (OPENAI_API_KEY not set) when the record was created, in which case `description` IS the original text
+  descriptionOriginal String? // raw text as entered by the employee, before any ИИ clean-up — kept so the AI-edited description (above) never silently loses the original wording; null if ИИ was unavailable (ANTHROPIC_API_KEY not set) when the record was created, in which case `description` IS the original text
   location        String
   volume          String
   materials       String
