@@ -165,7 +165,7 @@ export async function createCompletedWork(
     // app/ai.ts. The employee's own wording is always kept in
     // descriptionOriginal; `description` becomes the ИИ-polished version
     // only when ИИ actually returned one, otherwise it stays the original
-    // text (e.g. OPENAI_API_KEY not configured yet).
+    // text (e.g. ANTHROPIC_API_KEY not configured yet).
     const aiResult = await analyzeCompletedWork({
       description: validation.data.description,
       location: validation.data.location,
