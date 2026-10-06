@@ -3,7 +3,7 @@
 // (actions/completed-works.ts) and the MAX bot (max-bot/handler.ts), so the
 // behavior is identical no matter where a work entry is created.
 //
-// Best-effort by design: if OPENAI_API_KEY isn't set (admin hasn't added
+// Best-effort by design: if ANTHROPIC_API_KEY isn't set (admin hasn't added
 // it yet on the hosting panel) or the API call fails/times out for any
 // reason, callers get nulls back and fall back to the employee's own text /
 // no suggestion — the app must keep working without this key.
@@ -62,7 +62,7 @@ async function getSimilarConfirmedWorks(limit = 8): Promise<SimilarWork[]> {
 export async function analyzeCompletedWork(
   input: AnalyzeInput,
 ): Promise<AnalyzeResult> {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.ANTHROPIC_API_KEY;
 
   if (!apiKey) {
     return EMPTY_RESULT;
@@ -97,16 +97,16 @@ export async function analyzeCompletedWork(
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        authorization: `Bearer ${apiKey}`,
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: "claude-3-5-haiku-20241022",
         max_tokens: 300,
-        response_format: { type: "json_object" },
         messages: [{ role: "user", content: prompt }],
       }),
       signal: controller.signal,
@@ -117,9 +117,9 @@ export async function analyzeCompletedWork(
     }
 
     const json = (await response.json()) as {
-      choices?: { message?: { content?: string } }[];
+      content?: { type: string; text?: string }[];
     };
-    const text = json.choices?.[0]?.message?.content?.trim();
+    const text = json.content?.find((block) => block.type === "text")?.text?.trim();
 
     if (!text) {
       return EMPTY_RESULT;
