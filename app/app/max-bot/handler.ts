@@ -351,7 +351,7 @@ async function handlePhotoStep(
 // estimate alongside it — via the same shared app/ai.ts helper the web
 // panel uses, so both paths behave identically. A plain, deterministic
 // composition is always available as a fallback description, so the bot
-// keeps working even without OPENAI_API_KEY configured or if the API
+// keeps working even without ANTHROPIC_API_KEY configured or if the API
 // call fails; descriptionOriginal is set to whatever text this fallback
 // would have been, so the employee's actual input is never lost even when
 // ИИ does rewrite it.
